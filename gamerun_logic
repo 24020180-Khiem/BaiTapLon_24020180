@@ -1,0 +1,123 @@
+#include <SDL.h>
+#include <SDL_image.h>
+#include <iostream>
+#include <string>
+#include <vector>
+//hai thư viện dưới là để chọn từ random
+#include <ctime>
+#include <random>
+#include <fstream>
+#include <SDL_ttf.h>
+#include <limits>
+#include <cstdlib>
+#include "gamerun.h"
+using namespace std;
+void runGame(SDL_Renderer* renderer, const vector<string>& secret_wordpool, GameState& currentState) {
+    if (secret_wordpool.empty()) {
+        cout << "Error: No words loaded. Check file path!" << endl;
+        return;
+    }
+    string given_word = choose_given_word(secret_wordpool);
+    string represented_word;
+    for (int i = 0; i < given_word.size(); i++) {
+        represented_word += '-';
+    }
+    cout << represented_word << "\n";
+
+    string filename = "hangman0.png";
+    SDL_Texture* textures = Create_texture(renderer, filename);
+    if (!textures) {
+        cout << "Failed to load texture: " << filename << " - " << IMG_GetError() << endl;
+        return; // Exit if image loading fails
+    }
+
+    SDL_Texture* textures_2 = text_textures(renderer, represented_word, font, fontcolor);
+    if (!textures_2) {
+        cout << "Failed to create text texture: " << TTF_GetError() << endl;
+        SDL_DestroyTexture(textures);
+        return; // Exit if text rendering fails
+    }
+
+    int falsecount = 0;
+    bool gameRunning = true;
+
+    while (gameRunning && represented_word != given_word && falsecount < 6) {
+        SDL_PumpEvents();
+        SDL_Event event;
+
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                currentState = LOSE;
+                gameRunning = false;
+            }
+
+            if (event.type == SDL_KEYDOWN) {
+                char guessword = tolower(static_cast<char>(event.key.keysym.sym));
+                cout << "guessed word is: \n";
+                cout << guessword << endl;
+
+                int sameletter = 0;
+                for (int i = 0; i < given_word.size(); i++) {
+                    if (guessword == given_word[i]) {
+                        represented_word[i] = given_word[i];
+                        sameletter++;
+                    }
+                }
+                if (sameletter > 0) {
+                    cout << "you are right\n";
+                    cout << represented_word << "\n";
+                    cout << endl;
+                    SDL_DestroyTexture(textures_2);
+                    textures_2 = text_textures(renderer, represented_word, font, fontcolor);
+                    if (!textures_2) {
+                        cout << "Failed to create text texture: " << TTF_GetError() << endl;
+                        gameRunning = false;
+                    }
+                } else {
+                    cout << "you are wrong\n";
+                    cout << endl;
+                    falsecount++;
+                    switch (falsecount) {
+                        case 1: filename = "hangman1.png"; break;
+                        case 2: filename = "hangman2.png"; break;
+                        case 3: filename = "hangman3.png"; break;
+                        case 4: filename = "hangman4.png"; break;
+                        case 5: filename = "hangman5.png"; break;
+                        case 6: filename = "hangman6.png"; break;
+                        default: filename = "hangman0.png"; break;
+                    }
+                    SDL_DestroyTexture(textures);
+                    textures = Create_texture(renderer, filename);
+                    if (!textures) {
+                        cout << "Failed to load texture: " << filename << " - " << IMG_GetError() << endl;
+                        gameRunning = false;
+                    }
+                }
+            }
+        }
+
+        SDL_RenderClear(renderer);
+        if (textures) {
+            SDL_RenderCopy(renderer, textures, NULL, NULL);
+        }
+        if (textures_2) {
+            int textW, textH;
+            SDL_QueryTexture(textures_2, NULL, NULL, &textW, &textH);
+            int text_x_cord = 1000 / 2 - textW / 2;
+            SDL_Rect screenpaste = {text_x_cord, 300, textW, textH};
+            SDL_RenderCopy(renderer, textures_2, NULL, &screenpaste);
+        }
+        SDL_RenderPresent(renderer);
+    }
+
+    if (represented_word == given_word) {
+        cout << "you win! congratulation\n";
+        currentState = WIN;
+    } else if (falsecount == 6) {
+        cout << "answer is: " << given_word << endl;
+        cout << "you lose\n";
+        currentState = LOSE;
+    }
+    SDL_DestroyTexture(textures);
+    SDL_DestroyTexture(textures_2);
+}
