@@ -42,11 +42,9 @@ if (words_from_file.empty()) {
     cout << "Error: Word list is empty!" << endl;
     return "";
 }
-    mt19937 rng(static_cast<unsigned int>(time(0)));
+      int number = rand()%(int)words_from_file.size();
+    return words_from_file[number];
 
-    uniform_int_distribution<int> dist(0, words_from_file.size() - 1);
-
-    return words_from_file[dist(rng)];
 }
 
 
@@ -285,7 +283,7 @@ int main(int argc, char* argv[]) {
     SDL_Renderer* renderer = nullptr;
     int screen_width = 1000;
     int screen_height = 500;
-
+    srand(time(NULL));
     if (!init(window, renderer, screen_width, screen_height)) {
         return -1;
     }
