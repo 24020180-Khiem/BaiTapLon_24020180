@@ -8,8 +8,8 @@
 #include <random>
 #include <fstream>
 #include <SDL_ttf.h>
-#include <limits>
 #include <cstdlib>
+#include <SDL_mixer.h>
 using namespace std;
 enum GameState {
 MENU,
@@ -39,17 +39,14 @@ vector <string> words_from_file (const string &wordFilename)//hàm lấy dữ li
 }
 string choose_given_word (const vector<string> words_from_file){            //hàm chọn ngẫu nhiên 1 từ trong file (cụ thể hơn là mảng word_from_file{
 if (words_from_file.empty()) {
-    cout << "Error: Word list is empty!" << endl;
+    cout << "empty word list" << endl;
     return "";
 }
-      int number = rand()%(int)words_from_file.size();
+    int number = rand() % (int)words_from_file.size();
     return words_from_file[number];
-
 }
-
-
 bool init (SDL_Window*& window, SDL_Renderer*& renderer, int &width, int &height){       //hàm khởi tạo và chuẩn bị cho việc vẽ
-    if(SDL_Init(SDL_INIT_VIDEO) <0){
+    if(SDL_Init(SDL_INIT_VIDEO |SDL_INIT_AUDIO) <0){
         cout << "sdl init error\n";
         return false;
     }
@@ -63,8 +60,17 @@ bool init (SDL_Window*& window, SDL_Renderer*& renderer, int &width, int &height
         cout <<"renderer init error\n";
         return false;
     }
+    /*
+    if (Mix_Init(MIX_INIT_MP3) != MIX_INIT_MP3) {
+        cout << "Mix_Init MP3 error: " << Mix_GetError() << endl;
+        return false;
+    }
 
-
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        cout <<"open audio error\n" <<Mix_GetError();
+        return false;
+    }
+    */
     if (TTF_Init() == -1) {
     cout << "TTF init error: " << TTF_GetError() << endl;
     return false;
@@ -94,37 +100,26 @@ SDL_Texture* Create_texture (SDL_Renderer* renderer,const string filename)      
     SDL_FreeSurface(loaded_to_RAM);
     return img_texture;
 }
-void drawing(SDL_Renderer* renderer ,SDL_Texture* texture)                           //hàm vẽ
-{
-    SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer,texture,NULL,NULL);
-
-}
-
 struct Button {
     SDL_Rect rect;        // Vị trí và kích thước
     SDL_Texture* texture; // Texture của nút
-    bool isHovered;       // Trạng thái hover
 };
 Button easy_mode, hard_mode, restart, quitgame;
- //sẽ khởi tạo bằng initButtons trong main
 //vì bản thân các nút có ảnh hưởng đến gamemode chứ không phải texture đơn thuần(chỉ vẽ là được) nên phải xài hàm void thay vì SDL_Texture
-
 void initButtons(Button& button ,SDL_Renderer* renderer, const string filename, int x, int y, int width, int height) {
     SDL_Surface* loaded_to_RAM_2 = IMG_Load(filename.c_str());
     if (!loaded_to_RAM_2) {
-        cerr << "Failed to load buttons: " << IMG_GetError() << endl;
+        cerr << "load buttons failed " << IMG_GetError() << endl;
         return;
     }
     button.texture = SDL_CreateTextureFromSurface(renderer, loaded_to_RAM_2);
     button.rect = {x, y, width, height};
     SDL_FreeSurface(loaded_to_RAM_2);
 }
-
 void drawButton(SDL_Renderer* renderer, const Button& button) {         //chỉ đọc dữ liệu của button nên xài const đảm bảo nó không bị thay đổi
     SDL_RenderCopy(renderer, button.texture, NULL, &button.rect);
 }
-void drawBackground(SDL_Renderer* renderer, SDL_Texture* backgroundTexture){ //bản thân hàm Create_t đã tạo biến SDL_Texture có tên riêng và cũng đã xác định luôn file gốc của nó rồi
+void drawBackground(SDL_Renderer* renderer, SDL_Texture*  backgroundTexture){ //bản thân hàm Create_t đã tạo biến SDL_Texture có tên riêng và cũng đã xác định luôn file gốc của nó rồi
     SDL_RenderCopy(renderer,backgroundTexture, NULL,NULL );
 }
 void drawMainMenu(SDL_Renderer* renderer, SDL_Texture* GameStartBg) {
@@ -147,7 +142,7 @@ SDL_Color fontcolor = {100,100,100,100};
 SDL_Texture* text_textures (SDL_Renderer* renderer, const string stringname, TTF_Font* font, SDL_Color fontcolor)
 {
     if (!font) {
-    cout << "Failed to load font: " << TTF_GetError() << endl;
+    cout << "load font failed" << TTF_GetError() << endl;
     return nullptr;
     }
     SDL_Surface* loaded_to_RAM_3 = TTF_RenderText_Solid (font, stringname.c_str() , fontcolor);
@@ -161,17 +156,9 @@ SDL_Texture* text_textures (SDL_Renderer* renderer, const string stringname, TTF
     }
     return text_Textures;
 }
-void drawing_text (SDL_Texture* text_textures, SDL_Renderer* renderer,int screen_wide, int text_y_cord){
-    int textW, textH;
-    SDL_QueryTexture(text_textures, NULL, NULL, &textW, &textH);
-    int text_x_cord = screen_wide/2 - textW/2;
-    SDL_Rect screenpaste = {text_x_cord, text_y_cord, textW, textH};
-    SDL_RenderCopy(renderer, text_textures, NULL ,&screenpaste);
-    SDL_DestroyTexture(text_textures);
-}
 void runGame(SDL_Renderer* renderer, const vector<string>& secret_wordpool, GameState& currentState) {
     if (secret_wordpool.empty()) {
-        cout << "Error: No words loaded. Check file path!" << endl;
+        cout << "word pool empty" << endl;
         return;
     }
     string given_word = choose_given_word(secret_wordpool);
@@ -184,15 +171,15 @@ void runGame(SDL_Renderer* renderer, const vector<string>& secret_wordpool, Game
     string filename = "hangman0.png";
     SDL_Texture* textures = Create_texture(renderer, filename);
     if (!textures) {
-        cout << "Failed to load texture: " << filename << " - " << IMG_GetError() << endl;
-        return; // Exit if image loading fails
+        cout << "img texture fail " << filename << " - " << IMG_GetError() << endl;
+        return;
     }
 
     SDL_Texture* textures_2 = text_textures(renderer, represented_word, font, fontcolor);
     if (!textures_2) {
-        cout << "Failed to create text texture: " << TTF_GetError() << endl;
+        cout << "text texture fail " << TTF_GetError() << endl;
         SDL_DestroyTexture(textures);
-        return; // Exit if text rendering fails
+        return;
     }
 
     int falsecount = 0;
@@ -227,7 +214,7 @@ void runGame(SDL_Renderer* renderer, const vector<string>& secret_wordpool, Game
                     SDL_DestroyTexture(textures_2);
                     textures_2 = text_textures(renderer, represented_word, font, fontcolor);
                     if (!textures_2) {
-                        cout << "Failed to create text texture: " << TTF_GetError() << endl;
+                        cout << "create text texture failed: " << TTF_GetError() << endl;
                         gameRunning = false;
                     }
                 } else {
@@ -246,7 +233,7 @@ void runGame(SDL_Renderer* renderer, const vector<string>& secret_wordpool, Game
                     SDL_DestroyTexture(textures);
                     textures = Create_texture(renderer, filename);
                     if (!textures) {
-                        cout << "Failed to load texture: " << filename << " - " << IMG_GetError() << endl;
+                        cout << "load texture failed " << IMG_GetError() << endl;
                         gameRunning = false;
                     }
                 }
@@ -283,31 +270,35 @@ int main(int argc, char* argv[]) {
     SDL_Renderer* renderer = nullptr;
     int screen_width = 1000;
     int screen_height = 500;
-    srand(time(NULL));
+
     if (!init(window, renderer, screen_width, screen_height)) {
         return -1;
     }
+    /*
+    Mix_Music* music = Mix_LoadMUS("background_music.mp3");
 
+    if(!music){
+        cout << "music load failed" << Mix_GetError();
+        SDL_QUIT;
+    }
+    if (Mix_PlayMusic(music, -1) == -1) {
+        cout << "play music failed " << Mix_GetError() << endl;
+    }
+    */
     font = TTF_OpenFont("C:/Windows/Fonts/arial.ttf", 80);
     if (!font) {
-        cout << "Failed to load font: " << TTF_GetError() << endl;
+        cout << "load font failed " << TTF_GetError() << endl;
         TTF_Quit();
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         SDL_Quit();
         return -1;
     }
-
-
     SDL_Texture* menuBg = Create_texture(renderer, "gamestart_background.jpg");
     SDL_Texture* winBg = Create_texture(renderer, "gameover_win_background.jpg");
     SDL_Texture* loseBg = Create_texture(renderer, "gameover_lose_background.png");
     if (!menuBg || !winBg || !loseBg) {
-        cout << "Failed to load menu background: " << IMG_GetError() << endl;
-        TTF_CloseFont(font);
-        TTF_Quit();
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
+        cout << "load backgrounds failed  " << IMG_GetError() << endl;
         SDL_Quit();
         return -1;
     }
@@ -373,7 +364,6 @@ int main(int argc, char* argv[]) {
                 break;
         }
     }
-
     TTF_CloseFont(font);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
@@ -384,10 +374,11 @@ int main(int argc, char* argv[]) {
     SDL_DestroyTexture(menuBg);
     SDL_DestroyTexture(winBg);
     SDL_DestroyTexture(loseBg);
+    //Mix_FreeMusic(music);
+    //Mix_CloseAudio();
     IMG_Quit();
     TTF_Quit();
     SDL_Quit();
     return 0;
 }
-
 
